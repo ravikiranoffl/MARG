@@ -36,8 +36,8 @@ jobs:
           # Check if there are actual changes before trying to commit
           if ! git diff --quiet || ! git diff --staged --quiet; then
             # Generate a dynamic commit message using Indian Standard Time
-            TIMESTAMP=$(TZ='Asia/Kolkata' date +'%Y%m%d_%H%M%S')
-            git commit -m "MARG-SYNC-${TIMESTAMP}"
+            TIMESTAMP=$(TZ='Asia/Kolkata' date +'%Y%m%d%H%M%S')
+            git commit -m "MARG-${TIMESTAMP}"
             git push
           else
             echo "No new telemetry data. Skipping commit."
