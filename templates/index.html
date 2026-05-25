@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MARG | Index Matrix</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="ambient-engine">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <nav class="top-nav">
+        <div class="brand-container">
+            <h1 class="brand-logo">MARG</h1>
+            <div class="dispatch-time" id="agentGreeting">LINK: <span style="color: var(--text-muted);">AWAITING UPLINK</span></div>
+        </div>
+        <div class="hamburger" id="hamburgerBtn" onclick="toggleMenu()">
+            <span></span><span></span><span></span>
+        </div>
+    </nav>
+
+    <div class="sidebar" id="sidebarMenu">
+        <div class="sidebar-header">
+            <div id="liveClock" class="live-clock">00:00:00</div>
+            <div class="close-btn" onclick="toggleMenu()">&#10005;</div>
+        </div>
+        <a class="menu-item active-menu" onclick="switchView('view-search')">Archive Search</a>
+        <a class="menu-item" onclick="switchView('view-history'); renderHistory('my')">My Intel</a>
+        <a class="menu-item" onclick="switchView('view-history'); renderHistory('global')">Global Telemetry</a>
+        <a class="menu-item" onclick="logoutAgent()" style="color: var(--stat-dead); border-color: transparent;">Sever Link (Logout)</a>
+    </div>
+
+    <div class="container" id="mainContainer">
+        
+        <div id="view-search" class="view-section active">
+            <header>
+                <h1>INTELLIGENCE VAULT</h1>
+                <p class="section-sub"><span class="status-dot"></span> Query the global markdown archive</p>
+            </header>
+
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search the archive (e.g., US-Iran timeline)..." autocomplete="off">
+            </div>
+
+            <div id="searchResults" class="data-grid">
+                </div>
+        </div>
+
+        <div id="view-history" class="view-section">
+            <header>
+                <h1 id="historyTitle">GLOBAL TELEMETRY</h1>
+                <p class="section-sub"><span class="status-dot"></span> Live query logs</p>
+            </header>
+            
+            <div class="controls-wrapper" style="justify-content: center; gap: 15px;">
+                <button class="theme-btn active-theme" id="btnMyHistory" onclick="renderHistory('my')">My Intel</button>
+                <button class="theme-btn" id="btnGlobalHistory" onclick="renderHistory('global')">Global Network</button>
+            </div>
+
+            <ul class="lb-list" id="historyList">
+                <li style="justify-content: center; color: var(--text-muted);">Fetching vault logs...</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="authModal">
+        <div class="modal-content">
+            <h2 class="modal-title">INITIALIZE NEURAL LINK</h2>
+            <p class="modal-subtitle"><span class="status-dot"></span> MARG PROTOCOL REQUIRES CLEARANCE</p>
+            
+            <div class="input-group">
+                <label>Agent Alias (Name)</label>
+                <input type="text" id="authName" class="auth-input" placeholder="e.g. John Doe" autocomplete="off">
+            </div>
+            
+            <div class="input-group">
+                <label>Comm-Link (Mobile Number)</label>
+                <input type="tel" id="authMobile" class="auth-input" placeholder="Enter secure digits" autocomplete="off">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; font-weight: 600;">*Number is instantly hashed. Raw digits are never stored.</p>
+            </div>
+
+            <button class="export-btn" onclick="authenticateAgent()" style="width: 100%; margin-top: 20px;">ESTABLISH LINK &rarr;</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
