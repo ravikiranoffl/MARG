@@ -37,6 +37,7 @@
         <a class="menu-item active-menu" onclick="switchView('view-search')">Archive Search</a>
         <a class="menu-item" onclick="switchView('view-history'); renderHistory('my')">My Intel</a>
         <a class="menu-item" onclick="switchView('view-history'); renderHistory('global')">Global Telemetry</a>
+        <a class="menu-item" onclick="switchView('view-settings')">Matrix Calibration</a>
         <a class="menu-item" onclick="logoutAgent()" style="color: var(--stat-dead); border-color: transparent;">Sever Link (Logout)</a>
     </div>
 
@@ -49,7 +50,7 @@
             </header>
 
             <div class="search-container">
-                <input type="text" id="searchInput" class="search-input" placeholder="Search the archive (e.g., US-Iran timeline)..." autocomplete="off">
+                <input type="text" id="searchInput" class="search-input" autocomplete="off">
             </div>
 
             <div id="searchResults" class="data-grid">
@@ -71,11 +72,21 @@
                 <li style="justify-content: center; color: var(--text-muted);">Fetching vault logs...</li>
             </ul>
         </div>
+
+        <div id="view-settings" class="view-section">
+            <header>
+                <h1>MATRIX CALIBRATION</h1>
+                <p class="section-sub"><span class="status-dot"></span> Select Neural Core Interface</p>
+            </header>
+            <div class="theme-grid" id="themeButtonsContainer">
+                </div>
+        </div>
+
     </div>
 
     <div class="modal-overlay" id="authModal">
         <div class="modal-content">
-            <h2 class="modal-title">INITIALIZE NEURAL LINK</h2>
+            <h2 class="modal-title">LOGIN INDEX MATRIX</h2>
             <p class="modal-subtitle"><span class="status-dot"></span> MARG PROTOCOL REQUIRES CLEARANCE</p>
             
             <div class="input-group">
