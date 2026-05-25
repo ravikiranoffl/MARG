@@ -47,7 +47,7 @@ def sync_telemetry():
                 print("No new searches to sync.")
 
             if logins:
-                append_to_csv('login_history.csv', logins)
+                append_to_csv('login.csv', logins)
             else:
                 print("No new logins to sync.")
                 
