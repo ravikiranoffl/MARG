@@ -6,11 +6,110 @@ const GAS_WEBHOOK = "https://script.google.com/macros/s/AKfycbylBz2dufj1NrF8BWeT
 let searchIndex = [];
 let fuseEngine = null;
 let currentAgent = { name: null, mobileHash: null };
+let searchTimeout = null;
+
+// --- VEDA THEME ENGINE ---
+const themes = {
+    "Golden Vault": { base: "#050400", grad1: "#1a1600", grad2: "#030200", accent: "#ffb703", glow: "rgba(255, 183, 3, 0.4)", textHighlight: "#ffb703" },
+    "Neon Matrix": { base: "#030507", grad1: "#0a111a", grad2: "#020204", accent: "#00ffcc", glow: "rgba(0, 255, 204, 0.3)", textHighlight: "#00ffcc" },
+    "Crimson Protocol": { base: "#050001", grad1: "#1c0005", grad2: "#030000", accent: "#dc143c", glow: "rgba(220, 20, 60, 0.4)", textHighlight: "#ff4d6d" },
+    "Azure Nebula": { base: "#010306", grad1: "#051021", grad2: "#000103", accent: "#1e90ff", glow: "rgba(30, 144, 255, 0.4)", textHighlight: "#1e90ff" },
+    "Toxic Sludge": { base: "#020501", grad1: "#091703", grad2: "#010300", accent: "#77ff00", glow: "rgba(119, 255, 0, 0.3)", textHighlight: "#77ff00" }
+};
+
+let currentTheme = localStorage.getItem('marg_theme') || "Golden Vault";
+
+function applyTheme(themeName) {
+    const t = themes[themeName]; if (!t) return;
+    document.documentElement.style.setProperty('--bg-base', t.base);
+    document.documentElement.style.setProperty('--bg-grad1', t.grad1);
+    document.documentElement.style.setProperty('--bg-grad2', t.grad2);
+    document.documentElement.style.setProperty('--accent', t.accent);
+    document.documentElement.style.setProperty('--accent-glow', t.glow);
+    document.documentElement.style.setProperty('--border-highlight', t.glow);
+    document.documentElement.style.setProperty('--text-highlight', t.textHighlight);
+    
+    // Update active button state
+    document.querySelectorAll('.theme-box-btn').forEach(btn => {
+        if (btn.innerText === themeName.toUpperCase()) {
+            btn.classList.add('active-theme');
+            btn.style.borderColor = t.accent;
+            btn.style.boxShadow = `0 20px 40px rgba(0,0,0,0.8), 0 0 25px ${t.glow}`;
+        } else {
+            btn.classList.remove('active-theme');
+            btn.style.borderColor = 'transparent';
+            btn.style.boxShadow = `0 10px 20px rgba(0,0,0,0.4)`;
+        }
+    });
+    localStorage.setItem('marg_theme', themeName);
+}
+
+function initThemes() {
+    const container = document.getElementById('themeButtonsContainer');
+    Object.keys(themes).forEach(name => {
+        const btn = document.createElement('div');
+        btn.className = 'theme-box-btn';
+        btn.innerText = name.toUpperCase();
+        btn.style.background = `linear-gradient(135deg, ${themes[name].grad1}, ${themes[name].base})`;
+        btn.onclick = () => { applyTheme(name); };
+        container.appendChild(btn);
+    });
+    applyTheme(currentTheme);
+}
+
+// --- GHOST TYPER (Placeholder Animation) ---
+const ghostQueries = [
+    "Latest updates on US-Iran war...",
+    "Timeline of Telangana government...",
+    "Global tech embargo details 2026...",
+    "Economic shifts in Southeast Asia...",
+    "Search the TGCA archive..."
+];
+let ghostIdx = 0;
+let charIdx = 0;
+let isDeleting = false;
+let ghostTimeout;
+const searchInput = document.getElementById('searchInput');
+
+function ghostType() {
+    if(document.activeElement === searchInput) {
+        // Pause typing animation if user clicks the input
+        searchInput.setAttribute('placeholder', 'Enter query...');
+        ghostTimeout = setTimeout(ghostType, 1000);
+        return;
+    }
+
+    const currentText = ghostQueries[ghostIdx];
+    
+    if (isDeleting) {
+        searchInput.setAttribute('placeholder', currentText.substring(0, charIdx - 1));
+        charIdx--;
+    } else {
+        searchInput.setAttribute('placeholder', currentText.substring(0, charIdx + 1));
+        charIdx++;
+    }
+
+    let typeSpeed = isDeleting ? 30 : 100;
+
+    if (!isDeleting && charIdx === currentText.length) {
+        typeSpeed = 2000; // Pause at end of word
+        isDeleting = true;
+    } else if (isDeleting && charIdx === 0) {
+        isDeleting = false;
+        ghostIdx = (ghostIdx + 1) % ghostQueries.length;
+        typeSpeed = 500; // Pause before new word
+    }
+
+    ghostTimeout = setTimeout(ghostType, typeSpeed);
+}
+
 
 // --- INITIALIZATION ---
 document.addEventListener("DOMContentLoaded", () => {
     updateClock();
     setInterval(updateClock, 1000);
+    initThemes();
+    ghostType(); // Start auto-typer
     
     // Check Local Storage for Auth
     const savedAgent = localStorage.getItem('marg_agent');
@@ -30,7 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Real-time Search Listener
-    const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', (e) => {
         executeSearch(e.target.value);
     });
@@ -76,16 +174,12 @@ async function authenticateAgent() {
         return;
     }
 
-    // Generate secure client-side hash
     const secureHash = await hashMobile(mobile);
-    
     currentAgent = { name: name, mobileHash: secureHash };
     localStorage.setItem('marg_agent', JSON.stringify(currentAgent));
     
-    // Log login to Vault
     sendTelemetry('login', '');
 
-    // UI Transition
     document.getElementById('authModal').classList.remove('active');
     document.getElementById('mainContainer').classList.remove('blurred');
     activateSystem();
@@ -97,15 +191,16 @@ function activateSystem() {
 
 function logoutAgent() {
     localStorage.removeItem('marg_agent');
-    location.reload(); // Refresh to trigger auth modal
+    location.reload(); 
 }
 
-// --- SEARCH ENGINE LOGIC ---
+// --- SEARCH ENGINE LOGIC (With Extraction Hype) ---
 function executeSearch(query) {
     const resultsDiv = document.getElementById('searchResults');
     
     if (!query.trim()) {
         resultsDiv.innerHTML = '';
+        clearTimeout(searchTimeout);
         return;
     }
 
@@ -114,51 +209,62 @@ function executeSearch(query) {
         return;
     }
 
-    const results = fuseEngine.search(query);
-    
-    if (results.length === 0) {
-        resultsDiv.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1; text-align:center; padding: 40px; border: 1px solid var(--border); border-radius: 20px; background: rgba(0,0,0,0.5);">NO ARCHIVE MATCHES FOUND.</p>';
-        return;
-    }
+    // 1. Show Extraction Hype (Loading Bait)
+    resultsDiv.innerHTML = `
+        <div class="loading-bait">
+            <div class="loading-scanner"></div>
+            <div class="loading-text">EXTRACTING INTELLIGENCE...</div>
+        </div>
+    `;
 
-    // Render logic with dynamic keyword highlighting
-    let html = '';
-    const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex
-    const regex = new RegExp(`(${safeQuery})`, 'gi');
+    clearTimeout(searchTimeout);
 
-    results.slice(0, 15).forEach((result, index) => {
-        const item = result.item;
-        const highlightedContent = item.content.replace(regex, '<span class="match-highlight">$1</span>');
-        const delay = index * 0.05; // Staggered animation
+    // 2. Delay for 1.5 Seconds (Cinematic Delay), then render results
+    searchTimeout = setTimeout(() => {
+        const results = fuseEngine.search(query);
+        
+        if (results.length === 0) {
+            resultsDiv.innerHTML = '<p style="color:var(--text-muted); grid-column:1/-1; text-align:center; padding: 40px; border: 1px solid var(--border); border-radius: 20px; background: rgba(0,0,0,0.5);">NO ARCHIVE MATCHES FOUND.</p>';
+            return;
+        }
 
-        html += `
-            <div class="card" style="animation-delay: ${delay}s">
-                <div class="card-header">
-                    <span class="card-tag">${item.section}</span>
-                    <span class="timestamp">${item.date}</span>
+        let html = '';
+        const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+        const regex = new RegExp(`(${safeQuery})`, 'gi');
+
+        results.slice(0, 15).forEach((result, index) => {
+            const item = result.item;
+            const highlightedContent = item.content.replace(regex, '<span class="match-highlight">$1</span>');
+            const delay = index * 0.05; 
+
+            html += `
+                <div class="card" style="animation-delay: ${delay}s">
+                    <div class="card-header">
+                        <span class="card-tag">${item.section}</span>
+                        <span class="timestamp">${item.date}</span>
+                    </div>
+                    <div class="card-body">
+                        ${highlightedContent}
+                    </div>
                 </div>
-                <div class="card-body">
-                    ${highlightedContent}
-                </div>
-            </div>
-        `;
-    });
-    
-    resultsDiv.innerHTML = html;
+            `;
+        });
+        
+        resultsDiv.innerHTML = html;
+    }, 1500); 
 }
 
 // --- TELEMETRY & VAULT LOGIC ---
 function sendTelemetry(actionType, queryStr) {
-    if(!currentAgent.name) return; // Failsafe
+    if(!currentAgent.name) return; 
     
     const payload = {
         action: actionType,
-        mobile: currentAgent.mobileHash, // Sending HASH, not raw mobile
+        mobile: currentAgent.mobileHash,
         name: currentAgent.name,
         query: queryStr
     };
 
-    // Fire and forget via no-cors mode to bypass browser blocks
     fetch(GAS_WEBHOOK, {
         method: 'POST',
         mode: 'no-cors',
@@ -168,7 +274,6 @@ function sendTelemetry(actionType, queryStr) {
 }
 
 function renderHistory(mode) {
-    // UI Button Toggles
     document.getElementById('btnMyHistory').classList.remove('active-theme');
     document.getElementById('btnGlobalHistory').classList.remove('active-theme');
     
@@ -192,16 +297,14 @@ function renderHistory(mode) {
             const rows = csvText.split('\n').filter(row => row.trim() !== '');
             let parsedData = [];
             
-            // Assume format: Datetime_IST, Agent_Hash, Name, Query
             rows.forEach((row, i) => {
-                if(i === 0 && row.includes('Datetime_IST')) return; // Skip header
+                if(i === 0 && row.includes('Datetime_IST')) return; 
                 const cols = row.split(',');
                 if(cols.length >= 4) {
                     parsedData.push({ time: cols[0], hash: cols[1], name: cols[2], query: cols.slice(3).join(',') });
                 }
             });
 
-            // Filter logic
             if(mode === 'my') {
                 parsedData = parsedData.filter(d => d.hash === currentAgent.mobileHash);
             }
@@ -211,7 +314,6 @@ function renderHistory(mode) {
                 return;
             }
 
-            // Reverse for chronological newest-first
             parsedData.reverse();
 
             list.innerHTML = parsedData.slice(0, 50).map(d => `
