@@ -1,0 +1,44 @@
+name: MARG Indexer
+
+on:
+  schedule:
+    # Runs every 30 minutes to fetch new data from the Google Sheet
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Allows you to manually click "Run workflow" in the Actions tab
+
+jobs:
+  sync_data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Run Telemetry Sync
+        env:
+          # This pulls your Web App URL from the repository secrets
+          GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
+        # Changed this line since marg.py is now in the root folder
+        run: python marg.py
+
+      - name: Commit and Push Updates
+        run: |
+          git config --global user.name "ravikiranoffl"
+          git config --global user.email "171322216+ravikiranoffl@users.noreply.github.com"
+          
+          # Stage the CSV files
+          git add history.csv login.csv
+          
+          # Check if there are actual changes before trying to commit
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            # Generate a dynamic commit message using Indian Standard Time
+            TIMESTAMP=$(TZ='Asia/Kolkata' date +'%Y%m%d_%H%M%S')
+            git commit -m "MARG-SYNC-${TIMESTAMP}"
+            git push
+          else
+            echo "No new telemetry data. Skipping commit."
+          fi
