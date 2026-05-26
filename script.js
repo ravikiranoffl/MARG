@@ -187,10 +187,10 @@ function executeSearch(query) {
                         <h3 style="margin-top:0; color:var(--accent);">${item.title}</h3>
                         <p style="opacity:0.8; font-size: 0.9rem;">${snippet}</p>
                         
-                        <button class="theme-btn" style="margin-top: 15px; width: 100%;" 
-                            onclick="loadDeepScan('${item.id}', this)">
-                            Deep Scan Payload &rarr;
-                        </button>
+                       <button class="theme-btn" style="margin-top: 15px; width: 100%; position: relative; overflow: hidden;" onclick="loadAISummary('${item.id}', this)">
+                            <span style="position: relative; z-index: 2;">Summarize Intel (Local AI) &rarr;</span>
+                            <div id="progress-bar-${item.id}" style="position: absolute; bottom: 0; left: 0; height: 3px; background: #fff; width: 0%; z-index: 1; transition: width 0.2s;"></div>
+                       </button>
                         
                         <div id="payload-${item.id}" style="display:none; margin-top:15px; border-top:1px solid var(--border); padding-top:15px;"></div>
                     </div>
@@ -202,35 +202,107 @@ function executeSearch(query) {
 }
 
 // --- HEAVY DATA LAZY LOADER ---
-function loadDeepScan(dateId, btnElement) {
+// --- GLOBAL AI CORE ---
+let localAIEngine = null;
+
+async function initLocalAI(dateId, btnElement) {
+    if (localAIEngine) return localAIEngine;
+    
+    // Dynamically import WebLLM so we don't break the rest of your site
+    const { CreateMLCEngine } = await import('https://esm.run/@mlc.ai/web-llm');
+    
+    // We use Llama-3.2-1B. It's smart enough for summaries and small enough for browsers (~800MB)
+    const selectedModel = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
+    
+    const progressBar = document.getElementById(`progress-bar-${dateId}`);
+    
+    localAIEngine = await CreateMLCEngine(selectedModel, {
+        initProgressCallback: (info) => {
+            // Update the button text with the download progress
+            btnElement.querySelector('span').innerText = `Downloading Neural Weights... ${Math.round(info.progress * 100)}%`;
+            if(progressBar) progressBar.style.width = `${info.progress * 100}%`;
+        }
+    });
+    
+    if(progressBar) progressBar.style.display = 'none';
+    return localAIEngine;
+}
+
+// --- LOCAL AI SUMMARIZER ---
+async function loadAISummary(dateId, btnElement) {
     const payloadDiv = document.getElementById(`payload-${dateId}`);
     
-    if (payloadDiv.innerHTML !== "") {
+    // Toggle logic if already summarized
+    if (payloadDiv.innerHTML !== "" && !payloadDiv.innerHTML.includes("Decrypting")) {
         payloadDiv.style.display = payloadDiv.style.display === "none" ? "block" : "none";
-        btnElement.innerText = payloadDiv.style.display === "none" ? "Deep Scan Payload \u2192" : "\u2191 Close Payload";
+        btnElement.querySelector('span').innerText = payloadDiv.style.display === "none" ? "Summarize Intel (Local AI) \u2192" : "\u2191 Close Summary";
         return;
     }
 
-    btnElement.innerText = "Decrypting...";
+    const spanText = btnElement.querySelector('span');
+    spanText.innerText = "Initializing AI Core...";
     
-    fetch(`data/${dateId}.json`)
-        .then(res => res.json())
-        .then(data => {
-            let contentHtml = "";
-            data.forEach(section => {
-                contentHtml += `<h4 style="color:var(--text-main); margin-bottom:5px; margin-top:20px;">${section.section}</h4>`;
-                contentHtml += `<p style="font-size:0.9rem; color:var(--text-muted); line-height: 1.6;">${section.content}</p>`;
-            });
-            payloadDiv.innerHTML = contentHtml;
-            payloadDiv.style.display = "block";
-            btnElement.innerText = "\u2191 Close Payload";
-            btnElement.style.background = "transparent";
-            btnElement.style.border = "1px solid var(--border-highlight)";
-        })
-        .catch(err => {
-            btnElement.innerText = "DECRYPTION FAILED (Data file missing)";
-            btnElement.style.background = "var(--stat-dead)";
+    // Show a loading state
+    payloadDiv.innerHTML = `<p style="color: var(--accent); font-family: 'Fira Code', monospace; font-size: 0.9rem; animation: blink 1s infinite;">Establishing local neural link. Please wait...</p>`;
+    payloadDiv.style.display = "block";
+
+    try {
+        // 1. Fetch the actual daily payload from your GitHub Pages data folder
+        const res = await fetch(`data/${dateId}.json`);
+        if(!res.ok) throw new Error("Data file missing");
+        const data = await res.json();
+
+        // Combine all the text from that day into one block
+        let fullText = data.map(sec => `${sec.section}: ${sec.content}`).join("\n\n");
+
+        // 2. Boot up the WebLLM Engine (Downloads on first run, instant on subsequent runs)
+        const engine = await initLocalAI(dateId, btnElement);
+
+        spanText.innerText = "Summarizing Data...";
+        payloadDiv.innerHTML = `
+            <div style="background: rgba(0, 243, 255, 0.05); border: 1px solid var(--accent); border-radius: 12px; padding: 1.5rem; position: relative;">
+                <div style="position: absolute; top: -10px; left: 15px; background: var(--bg-base); padding: 0 10px; font-size: 0.75rem; color: var(--accent); font-weight: 800; letter-spacing: 2px;">NEURAL SUMMARY</div>
+                <div id="ai-output-${dateId}" style="font-size: 0.95rem; line-height: 1.7; color: var(--text-main);"></div>
+            </div>
+            
+            <button onclick="document.getElementById('raw-${dateId}').style.display='block'; this.style.display='none';" style="background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 8px 15px; border-radius: 8px; margin-top: 15px; cursor: pointer; font-size: 0.8rem;">Read Raw Payload</button>
+            <div id="raw-${dateId}" style="display: none; margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
+                ${data.map(sec => `<h4 style="margin-bottom:5px;">${sec.section}</h4><p>${sec.content}</p>`).join('')}
+            </div>
+        `;
+
+        const outputDiv = document.getElementById(`ai-output-${dateId}`);
+
+        // 3. Ask the AI to summarize
+        const messages = [
+            { role: "system", content: "You are an elite intelligence analyst. Summarize the following daily briefing in exactly 3 highly professional, concise bullet points. Focus on geopolitical, economic, and technological shifts." },
+            { role: "user", content: fullText }
+        ];
+
+        // Stream the response back so it types out in real-time
+        const chunks = await engine.chat.completions.create({
+            messages,
+            temperature: 0.5,
+            stream: true, // This makes it look like it's typing!
         });
+
+        let summaryText = "";
+        for await (const chunk of chunks) {
+            summaryText += chunk.choices[0]?.delta?.content || "";
+            // Replace newlines with HTML breaks and markdown bullets with actual bullets
+            outputDiv.innerHTML = summaryText.replace(/\n/g, "<br>").replace(/\*/g, "•");
+        }
+
+        spanText.innerText = "\u2191 Close Summary";
+        btnElement.style.background = "transparent";
+        btnElement.style.border = "1px solid var(--border-highlight)";
+
+    } catch (err) {
+        console.error("AI Generation Failed:", err);
+        spanText.innerText = "NEURAL LINK FAILED";
+        btnElement.style.background = "var(--stat-dead)";
+        payloadDiv.innerHTML = `<p style="color: var(--stat-dead);">Failed to load local AI. Ensure you are on a modern desktop browser (Chrome/Edge) with hardware acceleration enabled.</p>`;
+    }
 }
 
 // --- TELEMETRY ---
