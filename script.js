@@ -188,7 +188,7 @@ function executeSearch(query) {
                         <p style="opacity:0.8; font-size: 0.9rem;">${snippet}</p>
                         
                        <button class="theme-btn" style="margin-top: 15px; width: 100%; position: relative; overflow: hidden;" onclick="loadAISummary('${item.id}', this)">
-                            <span style="position: relative; z-index: 2;">Summarize Intel (Local AI) &rarr;</span>
+                            <span style="position: relative; z-index: 2;">Summarize Index &rarr;</span>
                             <div id="progress-bar-${item.id}" style="position: absolute; bottom: 0; left: 0; height: 3px; background: #fff; width: 0%; z-index: 1; transition: width 0.2s;"></div>
                        </button>
                         
