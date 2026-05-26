@@ -201,7 +201,6 @@ function executeSearch(query) {
     }, 1500); 
 }
 
-// --- HEAVY DATA LAZY LOADER ---
 // --- GLOBAL AI CORE ---
 let localAIEngine = null;
 
@@ -235,7 +234,7 @@ async function loadAISummary(dateId, btnElement) {
     // Toggle logic if already summarized
     if (payloadDiv.innerHTML !== "" && !payloadDiv.innerHTML.includes("Decrypting")) {
         payloadDiv.style.display = payloadDiv.style.display === "none" ? "block" : "none";
-        btnElement.querySelector('span').innerText = payloadDiv.style.display === "none" ? "Summarize Intel (Local AI) \u2192" : "\u2191 Close Summary";
+        btnElement.querySelector('span').innerText = payloadDiv.style.display === "none" ? "Summarize Index\u2192" : "\u2191 Close Summary";
         return;
     }
 
